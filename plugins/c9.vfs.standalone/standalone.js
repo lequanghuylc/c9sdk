@@ -44,12 +44,12 @@ function plugin(options, imports, register) {
     
     statics.addStatics([{
         path: __dirname + "/../../configs",
-        mount: "/configs"
+        mount: prefixRoute("/configs", subPath)
     }]);
 
     statics.addStatics([{
         path: __dirname + "/../../test/resources",
-        mount: "/test"
+        mount: prefixRoute("/test", subPath)
     }]);
 
     var api = frontdoor();

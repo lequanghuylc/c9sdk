@@ -30,7 +30,7 @@
         <script src="<%= architectConfig.configsPrefix %>/require_config.js"></script>
     <% } %>
     <script>
-        var plugins = <%-: architectConfig | JSONToJS %>;
+        var plugins = <%-: architectConfig.plugins | JSONToJS %>;
         
         <% if (packed) { %>
             require.MODULE_LOAD_URL = "<%= architectConfig.staticPrefix %>/standalone/modules"
