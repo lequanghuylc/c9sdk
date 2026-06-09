@@ -130,7 +130,7 @@ module.exports = function(config, optimist) {
         },
         {
             packagePath: "connect-architect/connect.static",
-            prefix: "/static"
+            prefix: config.staticPrefix
         },
         {
             packagePath: "./c9.error/error_handler",
@@ -189,7 +189,8 @@ module.exports = function(config, optimist) {
             projectUrl: config.projectUrl,
             homeUrl: config.homeUrl,
             workspaceType: workspaceType,
-            readonly: readonly
+            readonly: readonly,
+            subPath: process.env.C9_SUB_PATH || ""
         },
         "./c9.vfs.server/vfs.server",
         "./c9.error/logger.raygun_noop",

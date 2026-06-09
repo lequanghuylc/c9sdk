@@ -20,12 +20,19 @@ var resolve = require("path").resolve;
 var basename = require("path").basename;
 var frontdoor = require("frontdoor");
 
+
+function prefixRoute(path, subPath) {
+    if (!subPath) return path;
+    return "/" + subPath + path;
+}
 function plugin(options, imports, register) {
     var previewHandler = imports["preview.handler"];
     var statics = imports["connect.static"];
     
     assert(options.workspaceDir, "Option 'workspaceDir' is required");
     assert(options.options, "Option 'options' is required");
+    
+    var subPath = (options.subPath || "").replace(/^\/\+|\/\+$/g, "");
     
 
     // serve index.html
@@ -47,12 +54,12 @@ function plugin(options, imports, register) {
     var api = frontdoor();
     imports.connect.use(api);
     
-    api.get("/", function(req, res, next) {
+    api.get(prefixRoute("/", subPath), function(req, res, next) {
         res.writeHead(302, { "Location": options.sdk ? "/ide.html" : "/static/places.html" });
         res.end();
     });
     
-    api.get("/ide.html", {
+    api.get(prefixRoute("/ide.html", subPath), {
         params: {
             workspacetype: {
                 source: "query",
@@ -144,7 +151,7 @@ function plugin(options, imports, register) {
         return callback(null, { "ping": "pong" }); 
     });
     
-    api.get("/preview/:path*", [
+    api.get(prefixRoute("/preview/:path*", subPath), [
         function(req, res, next) {
             req.projectSession = {
                 pid: 1
@@ -163,11 +170,11 @@ function plugin(options, imports, register) {
         previewHandler.proxyCall()
     ]);
     
-    api.get("/preview", function(req, res, next) {
+    api.get(prefixRoute("/preview", subPath), function(req, res, next) {
         res.redirect(req.url + "/");
     });
 
-    api.get("/vfs-root", function(req, res, next) {
+    api.get(prefixRoute("/vfs-root", subPath), function(req, res, next) {
         if (!options.options.testing)
             return next();
             
@@ -175,7 +182,7 @@ function plugin(options, imports, register) {
         res.end("define(function(require, exports, module) { return " 
             + JSON.stringify(options.workspaceDir.replace(/\\/g, "/")) + "; });");
     });
-    api.get("/vfs-home", function(req, res, next) {
+    api.get(prefixRoute("/vfs-home", subPath), function(req, res, next) {
         if (!options.options.testing)
             return next();
             
@@ -184,7 +191,7 @@ function plugin(options, imports, register) {
             + JSON.stringify(process.env.HOME.replace(/\\/g, "/")) + "; });");
     });
 
-    api.get("/update", function(req, res, next) {
+    api.get(prefixRoute("/update", subPath), function(req, res, next) {
         res.writeHead(200, {
             "Content-Type": "application/javascript", 
             "Access-Control-Allow-Origin": "*"
@@ -197,7 +204,7 @@ function plugin(options, imports, register) {
         });
     });
     
-    api.get("/update/:path*", function(req, res, next) {
+    api.get(prefixRoute("/update/:path*", subPath), function(req, res, next) {
         var filename = req.params.path;
         var path = resolve(__dirname + "/../../build/output/" + resolve("/" + filename));
         
@@ -216,14 +223,14 @@ function plugin(options, imports, register) {
         });
     });
 
-    api.get("/configs/require_config.js", function(req, res, next) {
+    api.get(prefixRoute("/configs/require_config.js", subPath), function(req, res, next) {
         var config = res.getOptions().requirejsConfig || {};
         
         res.writeHead(200, { "Content-Type": "application/javascript" });
         res.end("requirejs.config(" + JSON.stringify(config) + ");");
     });
     
-    api.get("/test/all.json", function(req, res, next) {
+    api.get(prefixRoute("/test/all.json", subPath), function(req, res, next) {
         var base = __dirname + "/../../";
         var blacklistfile = base + "/test/blacklist.txt";
         var filefinder = require(base + "/test/lib/filefinder.js");

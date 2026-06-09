@@ -34,6 +34,7 @@ module.exports = function(manifest, installPath) {
         ? "~" + installPath.substr(home.length)
         : installPath;
     var inContainer = os.hostname().match(/-\d+$/);
+    var subPath = (process.env.C9_SUB_PATH || "").replace(/^\/+|\/+$/g, "");
     
     var config = {
         standalone: true,
@@ -61,14 +62,15 @@ module.exports = function(manifest, installPath) {
         nodeBin: [path.join(installPath, win32 ? "node.exe" : "node/bin/node"), process.execPath],
         installPath: installPath,
         correctedInstallPath: correctedInstallPath,
-        staticPrefix: "/static",
-        projectUrl: "/workspace",
+        staticPrefix: subPath ? "/" + subPath + "/static" : "/static",
+        projectUrl: subPath ? "/" + subPath + "/workspace" : "/workspace",
         ideBaseUrl: "http://c9.io",
-        previewUrl: "/preview",
+        previewUrl: subPath ? "/" + subPath + "/preview" : "/preview",
         dashboardUrl: "https://c9.io/dashboard.html",
         accountUrl: "https://c9.io/account",
-        apiUrl: "/api",
-        homeUrl: "/home",
+        apiUrl: subPath ? "/" + subPath + "/api" : "/api",
+        homeUrl: subPath ? "/" + subPath + "/home" : "/home",
+        configsPrefix: subPath ? "/" + subPath + "/configs" : "/configs",
         collab: false,
         installed: true,
         packed: false,
