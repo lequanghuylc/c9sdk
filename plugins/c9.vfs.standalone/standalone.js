@@ -12,6 +12,7 @@ plugin.provides = ["api", "passport"];
 module.exports = plugin;
     
 var fs = require("fs");
+require("amd-loader");
 var assert = require("assert");
 var async = require("async");
 var join = require("path").join;
@@ -372,18 +373,9 @@ function getSettings(configName, options) {
 }
 
 function getConfig(configName, options) {    
-    // Load config from configs/ide/default.js (AMD module)
+    // Load config from configs/ide/default.js (AMD module) using amd-loader
     var configPath = __dirname + "/../../configs/ide/default.js";
-    var configCode = fs.readFileSync(configPath, "utf8");
-    
-    // Remove AMD define() wrapper: "define(function(require, exports, module) {" at start
-    // and "});" at end
-    var code = configCode.trim();
-    code = code.replace(/^define\s*\(\s*function\s*\(require,\s*exports,\s*module\)\s*\{/, "");
-    code = code.replace(/\}\s*\}\s*\);?\s*$/, "}");
-    
-    // Evaluate to get the config function
-    var configFn = eval("(" + code + ")");
+    var configFn = require(configPath);
     var plugins = configFn(options);
     
     // Return object with staticPrefix, configsPrefix, and plugins for EJS template
