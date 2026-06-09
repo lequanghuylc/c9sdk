@@ -372,6 +372,22 @@ function getSettings(configName, options) {
 }
 
 function getConfig(configName, options) {    
-    var filename = __dirname + "/../../configs/client-" + configName + ".js";
-    return require(filename)(options);
+    // Load config from configs/ide/default.js (AMD module)
+    var configPath = __dirname + "/../../configs/ide/default.js";
+    var configCode = fs.readFileSync(configPath, "utf8");
+    
+    // Extract the function from AMD define() wrapper
+    var funcCode = configCode.replace(/^define\s*\(\s*function\s*\(/, "function(")
+                              .replace(/\)\s*\)\s*;?\s*$/, "}");
+    
+    // Evaluate to get the config function
+    var configFn = eval("(" + funcCode + ")");
+    var plugins = configFn(options);
+    
+    // Return object with staticPrefix, configsPrefix, and plugins for EJS template
+    return {
+        staticPrefix: options.staticPrefix || "/static",
+        configsPrefix: options.configsPrefix || "/configs",
+        plugins: plugins
+    };
 }
