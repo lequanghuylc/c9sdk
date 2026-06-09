@@ -55,7 +55,7 @@ function plugin(options, imports, register) {
     imports.connect.use(api);
     
     api.get(prefixRoute("/", subPath), function(req, res, next) {
-        res.writeHead(302, { "Location": options.sdk ? "/ide.html" : "/static/places.html" });
+        res.writeHead(302, { "Location": options.sdk ? (subPath ? "/" + subPath + "/ide.html" : "/ide.html") : (subPath ? "/" + subPath + "/static/places.html" : "/static/places.html") });
         res.end();
     });
     
