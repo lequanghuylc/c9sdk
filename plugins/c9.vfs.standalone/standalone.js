@@ -376,12 +376,14 @@ function getConfig(configName, options) {
     var configPath = __dirname + "/../../configs/ide/default.js";
     var configCode = fs.readFileSync(configPath, "utf8");
     
-    // Extract the function from AMD define() wrapper
-    var funcCode = configCode.replace(/^define\s*\(\s*function\s*\(/, "function(")
-                              .replace(/\)\s*\)\s*;?\s*$/, "}");
+    // Remove AMD define() wrapper: "define(function(require, exports, module) {" at start
+    // and "});" at end
+    var code = configCode.trim();
+    code = code.replace(/^define\s*\(\s*function\s*\(require,\s*exports,\s*module\)\s*\{/, "");
+    code = code.replace(/\}\s*\}\s*\);?\s*$/, "}");
     
     // Evaluate to get the config function
-    var configFn = eval("(" + funcCode + ")");
+    var configFn = eval("(" + code + ")");
     var plugins = configFn(options);
     
     // Return object with staticPrefix, configsPrefix, and plugins for EJS template
