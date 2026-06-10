@@ -39,7 +39,7 @@ function plugin(options, imports, register) {
     // serve index.html
     statics.addStatics([{
         path: __dirname + "/www",
-        mount: "/"
+        mount: prefixRoute("/", subPath)
     }]);
     
     statics.addStatics([{
