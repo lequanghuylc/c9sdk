@@ -59,7 +59,11 @@ function plugin(options, imports, register) {
         res.writeHead(302, { "Location": options.sdk ? (subPath ? "/" + subPath + "/ide.html" : "/ide.html") : (subPath ? "/" + subPath + "/static/places.html" : "/static/places.html") });
         res.end();
     });
-    
+
+    api.get(prefixRoute("/index.html", subPath), function(req, res, next) {
+        res.writeHead(302, { "Location": subPath ? "/" + subPath + "/ide.html" : "/ide.html" });
+        res.end();
+    });    
     api.get(prefixRoute("/ide.html", subPath), {
         params: {
             workspacetype: {
