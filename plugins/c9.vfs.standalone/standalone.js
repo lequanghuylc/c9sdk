@@ -36,15 +36,15 @@ function plugin(options, imports, register) {
     var subPath = (options.subPath || "").replace(/^\/\+|\/\+$/g, "");
     
 
-    // serve index.html
+    // www directory mounted at root so files serve under /static/ (e.g. /static/ide.html)
     statics.addStatics([{
         path: __dirname + "/www",
-        mount: prefixRoute("/", subPath)
+        mount: "/"
     }]);
-    
+
     statics.addStatics([{
         path: __dirname + "/../../configs",
-        mount: prefixRoute("/configs", subPath)
+        mount: "/configs"
     }]);
 
     statics.addStatics([{
@@ -52,15 +52,16 @@ function plugin(options, imports, register) {
         mount: prefixRoute("/test", subPath)
     }]);
 
+    // Serve plugins at /plugins for direct access, and /<subPath>/plugins for proxy access
     statics.addStatics([{
         path: __dirname + "/../../plugins",
         mount: "/plugins"
     }]);
-    
+
     // Serve node_modules lib directory as /static/lib/ for RequireJS packages
     statics.addStatics([{
         path: __dirname + "/../../node_modules",
-        mount: "/lib"
+        mount: "/static/lib"
     }]);
 
     // Also serve static files under sub-path for reverse proxy scenarios
@@ -73,21 +74,34 @@ function plugin(options, imports, register) {
             mount: subMount
         }]);
         
-        // Sub-path mounts for configs, plugins, lib
+        // Sub-path mounts for configs, plugins, lib - under /static/ prefix to work with connect.static
         statics.addStatics([{
             path: __dirname + "/../../configs",
-            mount: subMount + "/configs"
+            mount: subMount + "/static/configs"
         }]);
         
         statics.addStatics([{
             path: __dirname + "/../../plugins",
-            mount: subMount + "/plugins"
+            mount: subMount + "/static/plugins"
         }]);
-        
+
+        // Root-level static plugins for nginx-rewritten requests (/ide/plugins -> /plugins)
         statics.addStatics([{
             path: __dirname + "/../../node_modules",
-            mount: subMount + "/lib"
+            mount: subMount + "/static/lib"
         }]);
+
+        // Sub-path mount for static resources (mini_require.js, etc.)
+        statics.addStatics([{
+            path: __dirname + "/../../node_modules/architect-build/build_support",
+            mount: subMount + "/static"
+        }]);
+
+        statics.addStatics([{
+            path: __dirname + "/../../node_modules/ace/build_support",
+            mount: subMount + "/static"
+        }]);
+
     }
 
     var api = frontdoor();
