@@ -167,10 +167,11 @@ module.exports = function(config, optimist) {
                 "c9.cli.bridge": true,
                 "c9.nodeapi": true,
                 "saucelabs.preview": true,
-                "salesforce.sync": true,
-                "salesforce.language": true
-            }
+            "salesforce.sync": true,
+            "salesforce.language": true
         },
+        subPath: process.env.C9_SUB_PATH || ""
+    },
         "./c9.preview/statics",
         "./c9.nodeapi/nodeapi",
         {

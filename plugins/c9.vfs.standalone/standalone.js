@@ -52,6 +52,44 @@ function plugin(options, imports, register) {
         mount: prefixRoute("/test", subPath)
     }]);
 
+    statics.addStatics([{
+        path: __dirname + "/../../plugins",
+        mount: "/plugins"
+    }]);
+    
+    // Serve node_modules lib directory as /static/lib/ for RequireJS packages
+    statics.addStatics([{
+        path: __dirname + "/../../node_modules",
+        mount: "/lib"
+    }]);
+
+    // Also serve static files under sub-path for reverse proxy scenarios
+    if (subPath) {
+        var subMount = "/" + subPath;
+        
+        // Sub-path mounts for www (serves ide.html etc.)
+        statics.addStatics([{
+            path: __dirname + "/www",
+            mount: subMount
+        }]);
+        
+        // Sub-path mounts for configs, plugins, lib
+        statics.addStatics([{
+            path: __dirname + "/../../configs",
+            mount: subMount + "/configs"
+        }]);
+        
+        statics.addStatics([{
+            path: __dirname + "/../../plugins",
+            mount: subMount + "/plugins"
+        }]);
+        
+        statics.addStatics([{
+            path: __dirname + "/../../node_modules",
+            mount: subMount + "/lib"
+        }]);
+    }
+
     var api = frontdoor();
     imports.connect.use(api);
     
@@ -123,9 +161,10 @@ function plugin(options, imports, register) {
             opts.packed = opts.options.packed = true;
         
         var cdn = options.options.cdn;
-        options.options.themePrefix = "/static/" + cdn.version + "/skin/" + configName;
-        options.options.workerPrefix = "/static/" + cdn.version + "/worker";
-        options.options.CORSWorkerPrefix = opts.packed ? "/static/" + cdn.version + "/worker" : "";
+        var staticPathPrefix = subPath ? "/" + subPath : "";
+        options.options.themePrefix = staticPathPrefix + "/static/" + cdn.version + "/skin/" + configName;
+        options.options.workerPrefix = staticPathPrefix + "/static/" + cdn.version + "/worker";
+        options.options.CORSWorkerPrefix = opts.packed ? staticPathPrefix + "/static/" + cdn.version + "/worker" : "";
         
         api.updatConfig(opts.options, {
             w: req.params.w,
@@ -168,8 +207,9 @@ function plugin(options, imports, register) {
             var serverOptions = options.options;
             var host = serverOptions.host;
             if (host == "0.0.0.0") host = "localhost";
+            var vfsPath = subPath ? "/" + subPath + "/vfs" : "/vfs";
             return {
-                url: (serverOptions.secure ? "https://" : "http://") + host + ":" + serverOptions.port + "/vfs"
+                url: (serverOptions.secure ? "https://" : "http://") + host + ":" + serverOptions.port + vfsPath
             };
         }),
         previewHandler.proxyCall()
@@ -382,10 +422,20 @@ function getConfig(configName, options) {
     var configFn = require(configPath);
     var plugins = configFn(options);
     
+    // Get staticPrefix and configsPrefix, applying sub-path prefix if set
+    var subPath = (options.subPath || options.options && options.options.subPath || "").replace(/^\/+|\/+$/g, "");
+    var staticPrefix = options.staticPrefix || "/static";
+    var configsPrefix = options.configsPrefix || "/configs";
+    
+    if (subPath) {
+        staticPrefix = "/" + subPath + staticPrefix;
+        configsPrefix = "/" + subPath + configsPrefix;
+    }
+    
     // Return object with staticPrefix, configsPrefix, and plugins for EJS template
     return {
-        staticPrefix: options.staticPrefix || "/static",
-        configsPrefix: options.configsPrefix || "/configs",
+        staticPrefix: staticPrefix,
+        configsPrefix: configsPrefix,
         plugins: plugins
     };
 }
