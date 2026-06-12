@@ -64,6 +64,12 @@ function plugin(options, imports, register) {
         mount: "/static/lib"
     }]);
 
+    // Serve root node_modules architect package for RequireJS (needed by sub-path access)
+    statics.addStatics([{
+        path: __dirname + "/../node_modules/architect",
+        mount: "/ide/static/lib/architect"
+    }]);
+
     // Also serve static files under sub-path for reverse proxy scenarios
     if (subPath) {
         var subMount = "/" + subPath;
