@@ -62,7 +62,7 @@ module.exports = function(manifest, installPath) {
         nodeBin: [path.join(installPath, win32 ? "node.exe" : "node/bin/node"), process.execPath],
         installPath: installPath,
         correctedInstallPath: correctedInstallPath,
-        staticPrefix: subPath ? "/" + subPath + "/static" : "/static",
+        staticPrefix: "/static",
         projectUrl: subPath ? "/" + subPath + "/workspace" : "/workspace",
         ideBaseUrl: "http://c9.io",
         previewUrl: subPath ? "/" + subPath + "/preview" : "/preview",

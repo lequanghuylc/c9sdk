@@ -52,7 +52,7 @@ function plugin(options, imports, register) {
         mount: prefixRoute("/test", subPath)
     }]);
 
-    // Serve plugins at /plugins for direct access, and /<subPath>/plugins for proxy access
+    // Serve plugins at /plugins - serves at URL /plugins/... 
     statics.addStatics([{
         path: __dirname + "/../../plugins",
         mount: "/plugins"
@@ -64,50 +64,45 @@ function plugin(options, imports, register) {
         mount: "/static/lib"
     }]);
 
-    // Serve root node_modules architect package for RequireJS (needed by sub-path access)
+    // Root node_modules architect package for RequireJS
     statics.addStatics([{
         path: __dirname + "/../node_modules/architect",
-        mount: "/ide/static/lib/architect"
+        mount: "/static/lib/architect"
     }]);
 
-    // Also serve static files under sub-path for reverse proxy scenarios
+    // Also serve static files under sub-path for reverse proxy scenarios (C9_SUB_PATH)
     if (subPath) {
         var subMount = "/" + subPath;
         
-        // Sub-path mounts for www (serves ide.html etc.)
+        // Sub-path mount for www (serves ide.html etc.)
         statics.addStatics([{
             path: __dirname + "/www",
             mount: subMount
         }]);
         
-        // Sub-path mounts for configs, plugins, lib - under /static/ prefix to work with connect.static
-        statics.addStatics([{
-            path: __dirname + "/../../configs",
-            mount: subMount + "/static/configs"
-        }]);
-        
-        statics.addStatics([{
-            path: __dirname + "/../../plugins",
-            mount: subMount + "/static/plugins"
-        }]);
-
-        // Root-level static plugins for nginx-rewritten requests (/ide/plugins -> /plugins)
-        statics.addStatics([{
-            path: __dirname + "/../../node_modules",
-            mount: subMount + "/static/lib"
-        }]);
-
-        // Sub-path mount for static resources (mini_require.js, etc.)
+        // Sub-path mounts for static resources (mini_require.js, architect, etc.)
         statics.addStatics([{
             path: __dirname + "/../../node_modules/architect-build/build_support",
             mount: subMount + "/static"
         }]);
 
+        // Sub-path mounts for plugins under /<subPath>/plugins
         statics.addStatics([{
-            path: __dirname + "/../../node_modules/ace/build_support",
-            mount: subMount + "/static"
+            path: __dirname + "/../../plugins",
+            mount: subMount + "/plugins"
         }]);
 
+        // Sub-path mounts for lib under /<subPath>/static/lib
+        statics.addStatics([{
+            path: __dirname + "/../../node_modules",
+            mount: subMount + "/static/lib"
+        }]);
+
+        // Sub-path mounts for architect package
+        statics.addStatics([{
+            path: __dirname + "/../node_modules/architect",
+            mount: subMount + "/static/lib/architect"
+        }]);
     }
 
     var api = frontdoor();
@@ -181,10 +176,18 @@ function plugin(options, imports, register) {
             opts.packed = opts.options.packed = true;
         
         var cdn = options.options.cdn;
-        var staticPathPrefix = subPath ? "/" + subPath : "";
-        options.options.themePrefix = staticPathPrefix + "/static/" + cdn.version + "/skin/" + configName;
-        options.options.workerPrefix = staticPathPrefix + "/static/" + cdn.version + "/worker";
-        options.options.CORSWorkerPrefix = opts.packed ? staticPathPrefix + "/static/" + cdn.version + "/worker" : "";
+        // Use subPath prefix in staticPrefix so EJS generates URLs like /ide/static/...
+        var staticPrefix = "/static";
+        if (subPath) {
+            staticPrefix = "/" + subPath + staticPrefix;
+        }
+        var configsPrefix = "/configs";
+        if (subPath) {
+            configsPrefix = "/" + subPath + configsPrefix;
+        }
+        options.options.themePrefix = staticPrefix + "/" + cdn.version + "/skin/" + configName;
+        options.options.workerPrefix = staticPrefix + "/" + cdn.version + "/worker";
+        options.options.CORSWorkerPrefix = opts.packed ? staticPrefix + "/" + cdn.version + "/worker" : "";
         
         api.updatConfig(opts.options, {
             w: req.params.w,
@@ -211,7 +214,7 @@ function plugin(options, imports, register) {
         }, next);
     });
     
-    api.get("/_ping", function(params, callback) {
+    api.get("/_ping", function(params, callback) { 
         return callback(null, { "ping": "pong" }); 
     });
     
@@ -227,7 +230,10 @@ function plugin(options, imports, register) {
             var serverOptions = options.options;
             var host = serverOptions.host;
             if (host == "0.0.0.0") host = "localhost";
-            var vfsPath = subPath ? "/" + subPath + "/vfs" : "/vfs";
+            var vfsPath = "/vfs";
+            if (subPath) {
+                vfsPath = "/" + subPath + "/vfs";
+            }
             return {
                 url: (serverOptions.secure ? "https://" : "http://") + host + ":" + serverOptions.port + vfsPath
             };
@@ -418,8 +424,7 @@ function getSettings(configName, options) {
         "project": join(options.local ? installPath : join(workspaceDir, ".c9"), "project.settings"),
         "state": join(options.local ? installPath : join(workspaceDir, ".c9"), "state.settings")
     };
-    
-    var fs = require("fs");
+    // Load settings from files, replacing file paths with their contents
     for (var type in settings) {
         var data = "";
         try {
@@ -442,20 +447,10 @@ function getConfig(configName, options) {
     var configFn = require(configPath);
     var plugins = configFn(options);
     
-    // Get staticPrefix and configsPrefix, applying sub-path prefix if set
-    var subPath = (options.subPath || options.options && options.options.subPath || "").replace(/^\/+|\/+$/g, "");
-    var staticPrefix = options.staticPrefix || "/static";
-    var configsPrefix = options.configsPrefix || "/configs";
-    
-    if (subPath) {
-        staticPrefix = "/" + subPath + staticPrefix;
-        configsPrefix = "/" + subPath + configsPrefix;
-    }
-    
     // Return object with staticPrefix, configsPrefix, and plugins for EJS template
     return {
-        staticPrefix: staticPrefix,
-        configsPrefix: configsPrefix,
+        staticPrefix: options.staticPrefix || "/static",
+        configsPrefix: options.configsPrefix || "/configs",
         plugins: plugins
     };
 }
