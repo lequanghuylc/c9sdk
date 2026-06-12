@@ -64,6 +64,12 @@ function plugin(options, imports, register) {
         mount: "/static/lib"
     }]);
 
+    // Serve built modules at /static/build/modules for architect module loading
+    statics.addStatics([{
+        path: __dirname + "/../../build/build/modules",
+        mount: "/static/build/modules"
+    }]);
+
     // Root node_modules architect package for RequireJS
     statics.addStatics([{
         path: __dirname + "/../node_modules/architect",
