@@ -76,16 +76,28 @@ function plugin(options, imports, register) {
         mount: "/static/lib/architect"
     }]);
 
+    // Serve built skin CSS themes at /static/standalone/skin (for both root and sub-path access)
+    statics.addStatics([{
+        path: __dirname + "/../../build/standalone/skin",
+        mount: "/static/standalone/skin"
+    }]);
+
     // Also serve static files under sub-path for reverse proxy scenarios (C9_SUB_PATH)
     if (subPath) {
         var subMount = "/" + subPath;
-        
+
+        // Sub-path mounts for built skin CSS themes (must be BEFORE www mount to take priority)
+        statics.addStatics([{
+            path: __dirname + "/../../build/standalone/skin",
+            mount: subMount + "/static/standalone/skin"
+        }]);
+
         // Sub-path mount for www (serves ide.html etc.)
         statics.addStatics([{
             path: __dirname + "/www",
             mount: subMount
         }]);
-        
+
         // Sub-path mounts for static resources (mini_require.js, architect, etc.)
         statics.addStatics([{
             path: __dirname + "/../../node_modules/architect-build/build_support",
@@ -113,11 +125,26 @@ function plugin(options, imports, register) {
 
     var api = frontdoor();
     imports.connect.use(api);
-    
+
+    // Register root-level require_config route (when using root paths with nginx rewrite)
+    api.get("/configs/require_config.js", function(req, res, next) {
+        var config = res.getOptions().requirejsConfig || {};
+        res.writeHead(200, { "Content-Type": "application/javascript" });
+        res.end("requirejs.config(" + JSON.stringify(config) + ");");
+    });
+
+    // Handle root path and sub-path root (with or without trailing slash)
     api.get(prefixRoute("/", subPath), function(req, res, next) {
         res.writeHead(302, { "Location": options.sdk ? (subPath ? "/" + subPath + "/ide.html" : "/ide.html") : (subPath ? "/" + subPath + "/static/places.html" : "/static/places.html") });
         res.end();
     });
+    // Handle sub-path root with trailing slash (e.g., /ide/)
+    if (subPath) {
+        api.get("/" + subPath + "/", function(req, res, next) {
+            res.writeHead(302, { "Location": "/" + subPath + "/ide.html" });
+            res.end();
+        });
+    }
 
     api.get(prefixRoute("/index.html", subPath), function(req, res, next) {
         res.writeHead(302, { "Location": subPath ? "/" + subPath + "/ide.html" : "/ide.html" });
@@ -182,18 +209,17 @@ function plugin(options, imports, register) {
             opts.packed = opts.options.packed = true;
         
         var cdn = options.options.cdn;
-        // Use subPath prefix in staticPrefix so EJS generates URLs like /ide/static/...
-        var staticPrefix = "/static";
-        if (subPath) {
-            staticPrefix = "/" + subPath + staticPrefix;
-        }
-        var configsPrefix = "/configs";
-        if (subPath) {
-            configsPrefix = "/" + subPath + configsPrefix;
-        }
+        // staticPrefix includes subPath when C9_SUB_PATH is set (e.g., /ide/static)
+        var staticPrefix = subPath ? "/" + subPath + "/static" : "/static";
+        var configsPrefix = subPath ? "/" + subPath + "/configs" : "/configs";
+        options.themePrefix = staticPrefix + "/" + cdn.version + "/skin/" + configName;
         options.options.themePrefix = staticPrefix + "/" + cdn.version + "/skin/" + configName;
+        options.staticPrefix = staticPrefix;
+        options.configsPrefix = configsPrefix;
+        options.workerPrefix = staticPrefix + "/" + cdn.version + "/worker";
         options.options.workerPrefix = staticPrefix + "/" + cdn.version + "/worker";
-        options.options.CORSWorkerPrefix = opts.packed ? staticPrefix + "/" + cdn.version + "/worker" : "";
+        options.CORSWorkerPrefix = opts.packed ? staticPrefix + "/" + cdn.version + "/worker" : "";
+        options.options.CORSWorkerPrefix = options.CORSWorkerPrefix;
         
         api.updatConfig(opts.options, {
             w: req.params.w,
@@ -453,10 +479,9 @@ function getConfig(configName, options) {
     var configFn = require(configPath);
     var plugins = configFn(options);
     
-    // Return object with staticPrefix, configsPrefix, and plugins for EJS template
-    return {
-        staticPrefix: options.staticPrefix || "/static",
-        configsPrefix: options.configsPrefix || "/configs",
-        plugins: plugins
-    };
+    // Add staticPrefix and configsPrefix to the plugins array for EJS template access
+    plugins.staticPrefix = options.staticPrefix || "/static";
+    plugins.configsPrefix = options.configsPrefix || "/configs";
+    
+    return plugins;
 }
