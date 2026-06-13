@@ -33,7 +33,7 @@ function plugin(options, imports, register) {
     assert(options.workspaceDir, "Option 'workspaceDir' is required");
     assert(options.options, "Option 'options' is required");
     
-    var subPath = (options.subPath || "").replace(/^\/\+|\/\+$/g, "");
+    var subPath = (options.subPath || process.env.C9_SUB_PATH || "").replace(/^\/\+|\/\+$/g, "");
     
 
     // www directory mounted at root so files serve under /static/ (e.g. /static/ide.html)
@@ -209,9 +209,9 @@ function plugin(options, imports, register) {
             opts.packed = opts.options.packed = true;
         
         var cdn = options.options.cdn;
-        // staticPrefix includes subPath when C9_SUB_PATH is set (e.g., /ide/static)
-        var staticPrefix = subPath ? "/" + subPath + "/static" : "/static";
-        var configsPrefix = subPath ? "/" + subPath + "/configs" : "/configs";
+        // staticPrefix always uses root path - nginx rewrite handles /ide/* → backend root
+        var staticPrefix = "/static";
+        var configsPrefix = "/configs";
         options.themePrefix = staticPrefix + "/" + cdn.version + "/skin/" + configName;
         options.options.themePrefix = staticPrefix + "/" + cdn.version + "/skin/" + configName;
         options.staticPrefix = staticPrefix;
