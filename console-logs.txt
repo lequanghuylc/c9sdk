@@ -1,2 +1,0 @@
-[warning] Total Load Time:  2538
-[log] PubSub connected
