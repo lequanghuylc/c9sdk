@@ -1,0 +1,6 @@
+FROM c9sdk:latest AS base
+WORKDIR /app
+COPY --from=base /root/c9sdk .
+COPY . .
+EXPOSE 3399
+CMD ["node", "server.js", "-w", "/", "-l", "0.0.0.0", "-p", "3399"]

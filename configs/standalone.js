@@ -130,7 +130,7 @@ module.exports = function(config, optimist) {
         },
         {
             packagePath: "connect-architect/connect.static",
-            prefix: "/static"
+            prefix: config.staticPrefix
         },
         {
             packagePath: "./c9.error/error_handler",
@@ -167,10 +167,11 @@ module.exports = function(config, optimist) {
                 "c9.cli.bridge": true,
                 "c9.nodeapi": true,
                 "saucelabs.preview": true,
-                "salesforce.sync": true,
-                "salesforce.language": true
-            }
+            "salesforce.sync": true,
+            "salesforce.language": true
         },
+        subPath: process.env.C9_SUB_PATH || ""
+    },
         "./c9.preview/statics",
         "./c9.nodeapi/nodeapi",
         {
@@ -189,7 +190,8 @@ module.exports = function(config, optimist) {
             projectUrl: config.projectUrl,
             homeUrl: config.homeUrl,
             workspaceType: workspaceType,
-            readonly: readonly
+            readonly: readonly,
+            subPath: process.env.C9_SUB_PATH || ""
         },
         "./c9.vfs.server/vfs.server",
         "./c9.error/logger.raygun_noop",

@@ -1,0 +1,3 @@
+FROM c9sdk:latest
+COPY . /root/c9sdk/
+EXPOSE 3399

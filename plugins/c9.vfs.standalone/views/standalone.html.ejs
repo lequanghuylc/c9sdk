@@ -24,16 +24,16 @@
     <% include ../../c9.ide.server/views/load-screen.ejs %>
 
     <% if (packed) { %>
-        <script src="/static/<%=version%>/config/<%=configName%>.js"></script>
+        <script src="<%= architectConfig.staticPrefix %>/<%=version%>/config/<%=configName%>.js"></script>
     <% } else { %>
-        <script src="/static/mini_require.js"></script>
-        <script src="/configs/require_config.js"></script>
+        <script src="<%= architectConfig.staticPrefix %>/mini_require.js"></script>
+        <script src="<%= architectConfig.configsPrefix %>/require_config.js"></script>
     <% } %>
     <script>
-        var plugins = <%-: architectConfig | JSONToJS %>;
+        var plugins = <%-: architectConfig.plugins | JSONToJS %>;
         
         <% if (packed) { %>
-            require.MODULE_LOAD_URL = "/static/standalone/modules"
+            require.MODULE_LOAD_URL = "<%= architectConfig.staticPrefix %>/standalone/modules"
         <% } else { %>
             if (/es5=1/.test(location.search))
                 require.config.transform = "es5";

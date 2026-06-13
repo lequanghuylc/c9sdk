@@ -12,6 +12,7 @@ plugin.provides = ["api", "passport"];
 module.exports = plugin;
     
 var fs = require("fs");
+require("amd-loader");
 var assert = require("assert");
 var async = require("async");
 var join = require("path").join;
@@ -20,6 +21,11 @@ var resolve = require("path").resolve;
 var basename = require("path").basename;
 var frontdoor = require("frontdoor");
 
+
+function prefixRoute(path, subPath) {
+    if (!subPath) return path;
+    return "/" + subPath + path;
+}
 function plugin(options, imports, register) {
     var previewHandler = imports["preview.handler"];
     var statics = imports["connect.static"];
@@ -27,13 +33,15 @@ function plugin(options, imports, register) {
     assert(options.workspaceDir, "Option 'workspaceDir' is required");
     assert(options.options, "Option 'options' is required");
     
+    var subPath = (options.subPath || process.env.C9_SUB_PATH || "").replace(/^\/\+|\/\+$/g, "");
+    
 
-    // serve index.html
+    // www directory mounted at root so files serve under /static/ (e.g. /static/ide.html)
     statics.addStatics([{
         path: __dirname + "/www",
         mount: "/"
     }]);
-    
+
     statics.addStatics([{
         path: __dirname + "/../../configs",
         mount: "/configs"
@@ -41,18 +49,108 @@ function plugin(options, imports, register) {
 
     statics.addStatics([{
         path: __dirname + "/../../test/resources",
-        mount: "/test"
+        mount: prefixRoute("/test", subPath)
     }]);
+
+    // Serve plugins at /plugins - serves at URL /plugins/... 
+    statics.addStatics([{
+        path: __dirname + "/../../plugins",
+        mount: "/plugins"
+    }]);
+
+    // Serve node_modules lib directory as /static/lib/ for RequireJS packages
+    statics.addStatics([{
+        path: __dirname + "/../../node_modules",
+        mount: "/static/lib"
+    }]);
+
+    // Serve built modules at /static/build/modules for architect module loading
+    statics.addStatics([{
+        path: __dirname + "/../../build/build/modules",
+        mount: "/static/build/modules"
+    }]);
+
+    // Root node_modules architect package for RequireJS
+    statics.addStatics([{
+        path: __dirname + "/../node_modules/architect",
+        mount: "/static/lib/architect"
+    }]);
+
+    // Serve built skin CSS themes at /static/standalone/skin (for both root and sub-path access)
+    statics.addStatics([{
+        path: __dirname + "/../../build/standalone/skin",
+        mount: "/static/standalone/skin"
+    }]);
+
+    // Also serve static files under sub-path for reverse proxy scenarios (C9_SUB_PATH)
+    if (subPath) {
+        var subMount = "/" + subPath;
+
+        // Sub-path mounts for built skin CSS themes (must be BEFORE www mount to take priority)
+        statics.addStatics([{
+            path: __dirname + "/../../build/standalone/skin",
+            mount: subMount + "/static/standalone/skin"
+        }]);
+
+        // Sub-path mount for www (serves ide.html etc.)
+        statics.addStatics([{
+            path: __dirname + "/www",
+            mount: subMount
+        }]);
+
+        // Sub-path mounts for static resources (mini_require.js, architect, etc.)
+        statics.addStatics([{
+            path: __dirname + "/../../node_modules/architect-build/build_support",
+            mount: subMount + "/static"
+        }]);
+
+        // Sub-path mounts for plugins under /<subPath>/plugins
+        statics.addStatics([{
+            path: __dirname + "/../../plugins",
+            mount: subMount + "/plugins"
+        }]);
+
+        // Sub-path mounts for lib under /<subPath>/static/lib
+        statics.addStatics([{
+            path: __dirname + "/../../node_modules",
+            mount: subMount + "/static/lib"
+        }]);
+
+        // Sub-path mounts for architect package
+        statics.addStatics([{
+            path: __dirname + "/../node_modules/architect",
+            mount: subMount + "/static/lib/architect"
+        }]);
+    }
 
     var api = frontdoor();
     imports.connect.use(api);
-    
-    api.get("/", function(req, res, next) {
-        res.writeHead(302, { "Location": options.sdk ? "/ide.html" : "/static/places.html" });
+
+    // Register root-level require_config route (when using root paths with nginx rewrite)
+    api.get("/configs/require_config.js", function(req, res, next) {
+        var config = res.getOptions().requirejsConfig || {};
+        res.writeHead(200, { "Content-Type": "application/javascript" });
+        res.end("requirejs.config(" + JSON.stringify(config) + ");");
+    });
+
+    // Handle root path and sub-path root (with or without trailing slash)
+    api.get(prefixRoute("/", subPath), function(req, res, next) {
+        res.writeHead(302, { "Location": options.sdk ? (subPath ? "/" + subPath + "/ide.html" : "/ide.html") : (subPath ? "/" + subPath + "/static/places.html" : "/static/places.html") });
         res.end();
     });
-    
-    api.get("/ide.html", {
+    // Handle sub-path root with trailing slash (e.g., /ide/)
+    if (subPath) {
+        api.get("/" + subPath + "/", function(req, res, next) {
+            res.writeHead(302, { "Location": "/" + subPath + "/ide.html" });
+            res.end();
+        });
+    }
+
+    api.get(prefixRoute("/index.html", subPath), function(req, res, next) {
+        res.writeHead(302, { "Location": subPath ? "/" + subPath + "/ide.html" : "/ide.html" });
+        res.end();
+    });    
+    api.get(prefixRoute("/ide.html", subPath), {
         params: {
             workspacetype: {
                 source: "query",
@@ -111,9 +209,17 @@ function plugin(options, imports, register) {
             opts.packed = opts.options.packed = true;
         
         var cdn = options.options.cdn;
-        options.options.themePrefix = "/static/" + cdn.version + "/skin/" + configName;
-        options.options.workerPrefix = "/static/" + cdn.version + "/worker";
-        options.options.CORSWorkerPrefix = opts.packed ? "/static/" + cdn.version + "/worker" : "";
+        // staticPrefix always uses root path - nginx rewrite handles /ide/* → backend root
+        var staticPrefix = "/static";
+        var configsPrefix = "/configs";
+        options.themePrefix = staticPrefix + "/" + cdn.version + "/skin/" + configName;
+        options.options.themePrefix = staticPrefix + "/" + cdn.version + "/skin/" + configName;
+        options.staticPrefix = staticPrefix;
+        options.configsPrefix = configsPrefix;
+        options.workerPrefix = staticPrefix + "/" + cdn.version + "/worker";
+        options.options.workerPrefix = staticPrefix + "/" + cdn.version + "/worker";
+        options.CORSWorkerPrefix = opts.packed ? staticPrefix + "/" + cdn.version + "/worker" : "";
+        options.options.CORSWorkerPrefix = options.CORSWorkerPrefix;
         
         api.updatConfig(opts.options, {
             w: req.params.w,
@@ -140,11 +246,11 @@ function plugin(options, imports, register) {
         }, next);
     });
     
-    api.get("/_ping", function(params, callback) {
+    api.get("/_ping", function(params, callback) { 
         return callback(null, { "ping": "pong" }); 
     });
     
-    api.get("/preview/:path*", [
+    api.get(prefixRoute("/preview/:path*", subPath), [
         function(req, res, next) {
             req.projectSession = {
                 pid: 1
@@ -156,18 +262,22 @@ function plugin(options, imports, register) {
             var serverOptions = options.options;
             var host = serverOptions.host;
             if (host == "0.0.0.0") host = "localhost";
+            var vfsPath = "/vfs";
+            if (subPath) {
+                vfsPath = "/" + subPath + "/vfs";
+            }
             return {
-                url: (serverOptions.secure ? "https://" : "http://") + host + ":" + serverOptions.port + "/vfs"
+                url: (serverOptions.secure ? "https://" : "http://") + host + ":" + serverOptions.port + vfsPath
             };
         }),
         previewHandler.proxyCall()
     ]);
     
-    api.get("/preview", function(req, res, next) {
+    api.get(prefixRoute("/preview", subPath), function(req, res, next) {
         res.redirect(req.url + "/");
     });
 
-    api.get("/vfs-root", function(req, res, next) {
+    api.get(prefixRoute("/vfs-root", subPath), function(req, res, next) {
         if (!options.options.testing)
             return next();
             
@@ -175,7 +285,7 @@ function plugin(options, imports, register) {
         res.end("define(function(require, exports, module) { return " 
             + JSON.stringify(options.workspaceDir.replace(/\\/g, "/")) + "; });");
     });
-    api.get("/vfs-home", function(req, res, next) {
+    api.get(prefixRoute("/vfs-home", subPath), function(req, res, next) {
         if (!options.options.testing)
             return next();
             
@@ -184,7 +294,7 @@ function plugin(options, imports, register) {
             + JSON.stringify(process.env.HOME.replace(/\\/g, "/")) + "; });");
     });
 
-    api.get("/update", function(req, res, next) {
+    api.get(prefixRoute("/update", subPath), function(req, res, next) {
         res.writeHead(200, {
             "Content-Type": "application/javascript", 
             "Access-Control-Allow-Origin": "*"
@@ -197,7 +307,7 @@ function plugin(options, imports, register) {
         });
     });
     
-    api.get("/update/:path*", function(req, res, next) {
+    api.get(prefixRoute("/update/:path*", subPath), function(req, res, next) {
         var filename = req.params.path;
         var path = resolve(__dirname + "/../../build/output/" + resolve("/" + filename));
         
@@ -216,14 +326,14 @@ function plugin(options, imports, register) {
         });
     });
 
-    api.get("/configs/require_config.js", function(req, res, next) {
+    api.get(prefixRoute("/configs/require_config.js", subPath), function(req, res, next) {
         var config = res.getOptions().requirejsConfig || {};
         
         res.writeHead(200, { "Content-Type": "application/javascript" });
         res.end("requirejs.config(" + JSON.stringify(config) + ");");
     });
     
-    api.get("/test/all.json", function(req, res, next) {
+    api.get(prefixRoute("/test/all.json", subPath), function(req, res, next) {
         var base = __dirname + "/../../";
         var blacklistfile = base + "/test/blacklist.txt";
         var filefinder = require(base + "/test/lib/filefinder.js");
@@ -346,8 +456,7 @@ function getSettings(configName, options) {
         "project": join(options.local ? installPath : join(workspaceDir, ".c9"), "project.settings"),
         "state": join(options.local ? installPath : join(workspaceDir, ".c9"), "state.settings")
     };
-    
-    var fs = require("fs");
+    // Load settings from files, replacing file paths with their contents
     for (var type in settings) {
         var data = "";
         try {
@@ -365,6 +474,14 @@ function getSettings(configName, options) {
 }
 
 function getConfig(configName, options) {    
-    var filename = __dirname + "/../../configs/client-" + configName + ".js";
-    return require(filename)(options);
+    // Load config from configs/ide/default.js (AMD module) using amd-loader
+    var configPath = __dirname + "/../../configs/ide/default.js";
+    var configFn = require(configPath);
+    var plugins = configFn(options);
+    
+    // Add staticPrefix and configsPrefix to the plugins array for EJS template access
+    plugins.staticPrefix = options.staticPrefix || "/static";
+    plugins.configsPrefix = options.configsPrefix || "/configs";
+    
+    return plugins;
 }

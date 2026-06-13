@@ -34,6 +34,7 @@ module.exports = function(manifest, installPath) {
         ? "~" + installPath.substr(home.length)
         : installPath;
     var inContainer = os.hostname().match(/-\d+$/);
+    var subPath = (process.env.C9_SUB_PATH || "").replace(/^\/+|\/+$/g, "");
     
     var config = {
         standalone: true,
@@ -69,6 +70,7 @@ module.exports = function(manifest, installPath) {
         accountUrl: "https://c9.io/account",
         apiUrl: "/api",
         homeUrl: "/home",
+        configsPrefix: "/configs",
         collab: false,
         installed: true,
         packed: false,
