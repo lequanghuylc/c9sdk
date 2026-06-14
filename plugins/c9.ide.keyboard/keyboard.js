@@ -40,39 +40,31 @@ define(function(require, exports, module) {
             ].join("\n"), null, plugin);
 
             // Key definitions: {label, keyCode, key, send, isModifier}
-            // For keys typed via iOS keyboard (like C), use "sendOnChar" for Ctrl combinations
             var keyDefs = [
-                // Row 1: F11, F12 + special combo
-                { label: "F11", keyCode: 122, key: "F11", send: "\x1b[23~" },
-                { label: "F12", keyCode: 123, key: "F12", send: "\x1b[24~" },
-                { label: "^C", keyCode: 99, key: "c", send: "\x03", isComboCtrlC: true },
-
-                // Row 2: Navigation keys
+                { label: "^C", keyCode: 99, key: "c", send: "\x03" },
+                { label: "`", keyCode: 192, key: "`", send: "`" },
+                { label: "(", keyCode: 57, key: "1", send: "(" },
+                { label: ")", keyCode: 48, key: "0", send: ")" },
+                { label: "{", keyCode: 219, key: "OpenBracket", send: "{" },
+                { label: "}", keyCode: 221, key: "CloseBracket", send: "}" },
                 { label: "Esc", keyCode: 27, key: "Escape", send: "\x1b" },
                 { label: "Tab", keyCode: 9, key: "Tab", send: "\t" },
                 { label: "Backspace", keyCode: 8, key: "Backspace", send: "\x7f" },
                 { label: "Del", keyCode: 46, key: "Delete", send: "\x1b[3~" },
                 { label: "Home", keyCode: 36, key: "Home", send: "\x1b[1~" },
                 { label: "End", keyCode: 35, key: "End", send: "\x1b[4~" },
-                { label: "PgUp", keyCode: 33, key: "PageUp", send: "\x1b[5~" },
-                { label: "PgDn", keyCode: 34, key: "PageDown", send: "\x1b[6~" },
-
-                // Row 3: Modifiers
                 { label: "Ctrl", keyCode: 17, key: "Control", isModifier: true },
                 { label: "Alt", keyCode: 18, key: "Alt", isModifier: true },
                 { label: "Cmd", keyCode: 91, key: "Meta", isModifier: true },
-
-                // Row 4: Arrow keys
                 { label: "↑", keyCode: 38, key: "ArrowUp", send: "\x1b[A" },
                 { label: "↓", keyCode: 40, key: "ArrowDown", send: "\x1b[B" },
                 { label: "←", keyCode: 37, key: "ArrowLeft", send: "\x1b[D" },
                 { label: "→", keyCode: 39, key: "ArrowRight", send: "\x1b[C" },
             ];
 
-            // Character keys for Ctrl combinations (used when iOS keyboard types A-Z while Ctrl is held)
-            var charKeys = {};
-            for (var i = 65; i <= 90; i++) {
-                charKeys[i] = { label: String.fromCharCode(i), keyCode: i, key: String.fromCharCode(i), send: String.fromCharCode(i - 64) };
+            // Detect mobile (narrow viewport)
+            function isMobile() {
+                return window.innerWidth < 768 || ('ontouchstart' in window && window.innerWidth < 1024);
             }
 
             /***** Initialization *****/
@@ -180,31 +172,40 @@ define(function(require, exports, module) {
 
                     keyboardBar.appendChild(header);
 
-                    // Key container
+                    // Key container - auto-wrap layout
                     var keyContainer = document.createElement("div");
-                    keyContainer.style.cssText = "display:flex;flex-wrap:wrap;gap:3px;padding:4px;";
+                    keyContainer.style.cssText = "display:flex;flex-wrap:wrap;gap:4px;padding:6px;justify-content:center;";
 
-                    // Group keys by rows
-                    var rows = [
-                        // Row 1: F11, F12, ^C (Ctrl+C combo)
-                        keyDefs.filter(function(k) { return k.label === "F11" || k.label === "F12" || k.isComboCtrlC; }),
-                        // Row 2: Navigation keys
-                        keyDefs.filter(function(k) { return [27, 9, 8, 46, 36, 35, 33, 34].indexOf(k.keyCode) !== -1; }),
-                        // Row 3: Modifiers
-                        keyDefs.filter(function(k) { return k.isModifier; }),
-                        // Row 4: Arrow keys
-                        keyDefs.filter(function(k) { return [38, 40, 37, 39].indexOf(k.keyCode) !== -1; }),
-                    ];
+                    // Mobile detection for layout
+                    var mobile = isMobile();
 
-                    rows.forEach(function(rowKeys) {
-                        var rowDiv = document.createElement("div");
-                        rowDiv.style.cssText = "display:flex;gap:3px;flex-wrap:wrap;";
-                        rowKeys.forEach(function(keyDef) {
-                            var btn = createKeyButton(keyDef);
-                            rowDiv.appendChild(btn);
+                    if (mobile) {
+                        // Mobile: 2 rows only
+                        // Row A: special keys + nav (^C, symbols, Esc, Tab, Backspace, Del)
+                        var rowAKeys = keyDefs.filter(function(k) {
+                            return k.label === "^C" || [27, 9, 8, 46].indexOf(k.keyCode) !== -1 || ["`", "(", ")", "{", "}"].indexOf(k.label) !== -1;
                         });
-                        keyContainer.appendChild(rowDiv);
-                    });
+                        // Row B: modifiers + arrows
+                        var rowBKeys = keyDefs.filter(function(k) {
+                            return k.isModifier || [38, 40, 37, 39].indexOf(k.keyCode) !== -1 || k.label === "Home" || k.label === "End";
+                        });
+
+                        [rowAKeys, rowBKeys].forEach(function(rowKeys) {
+                            var rowDiv = document.createElement("div");
+                            rowDiv.style.cssText = "display:flex;gap:4px;flex-wrap:wrap;justify-content:center;width:100%;";
+                            rowKeys.forEach(function(keyDef) {
+                                var btn = createKeyButton(keyDef);
+                                rowDiv.appendChild(btn);
+                            });
+                            keyContainer.appendChild(rowDiv);
+                        });
+                    } else {
+                        // Desktop: single row with flex-wrap
+                        keyDefs.forEach(function(keyDef) {
+                            var btn = createKeyButton(keyDef);
+                            keyContainer.appendChild(btn);
+                        });
+                    }
 
                     keyboardBar.appendChild(keyContainer);
                     document.body.appendChild(keyboardBar);
