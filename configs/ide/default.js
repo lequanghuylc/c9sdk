@@ -467,6 +467,9 @@ module.exports = function(options) {
         },
         "plugins/c9.ide.terminal/opentermhere",
         {
+            packagePath: "plugins/c9.ide.keyboard/keyboard",
+        },
+        {
             packagePath: "plugins/c9.ide.run/output",
             tmux: options.tmux,
             basePath: workspaceDir
