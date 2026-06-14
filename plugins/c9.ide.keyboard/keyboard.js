@@ -18,11 +18,12 @@ define(function(require, exports, module) {
             var plugin = new Plugin("Ajax.org", main.consumes);
             var emit = plugin.getEmitter();
 
-            var keyboardBar, keyboardOverlay, isVisible = false;
+            var keyboardBar, isVisible = false;
             var isDragging = false;
             var dragOffset = { x: 0, y: 0 };
             var dragTarget = null;
             var modifierState = { ctrl: false, alt: false, meta: false };
+            var globalKeyHandler = null;
 
             // Insert CSS for keyboard button
             ui.insertCss([
@@ -38,36 +39,41 @@ define(function(require, exports, module) {
                 "}",
             ].join("\n"), null, plugin);
 
-            // Key definitions
+            // Key definitions: {label, keyCode, key, send, isModifier}
+            // For keys typed via iOS keyboard (like C), use "sendOnChar" for Ctrl combinations
             var keyDefs = [
-                { label: "F1", keyCode: 112, key: "F1", send: "\x1bOP" },
-                { label: "F2", keyCode: 113, key: "F2", send: "\x1bOQ" },
-                { label: "F3", keyCode: 114, key: "F3", send: "\x1bOR" },
-                { label: "F4", keyCode: 115, key: "F4", send: "\x1bOS" },
-                { label: "F5", keyCode: 116, key: "F5", send: "\x1b[15~" },
-                { label: "F6", keyCode: 117, key: "F6", send: "\x1b[17~" },
-                { label: "F7", keyCode: 118, key: "F7", send: "\x1b[18~" },
-                { label: "F8", keyCode: 119, key: "F8", send: "\x1b[19~" },
-                { label: "F9", keyCode: 120, key: "F9", send: "\x1b[20~" },
-                { label: "F10", keyCode: 121, key: "F10", send: "\x1b[21~" },
+                // Row 1: F11, F12 + special combo
                 { label: "F11", keyCode: 122, key: "F11", send: "\x1b[23~" },
                 { label: "F12", keyCode: 123, key: "F12", send: "\x1b[24~" },
+                { label: "^C", keyCode: 99, key: "c", send: "\x03", isComboCtrlC: true },
+
+                // Row 2: Navigation keys
                 { label: "Esc", keyCode: 27, key: "Escape", send: "\x1b" },
                 { label: "Tab", keyCode: 9, key: "Tab", send: "\t" },
                 { label: "Backspace", keyCode: 8, key: "Backspace", send: "\x7f" },
-                { label: "Delete", keyCode: 46, key: "Delete", send: "\x1b[3~" },
+                { label: "Del", keyCode: 46, key: "Delete", send: "\x1b[3~" },
                 { label: "Home", keyCode: 36, key: "Home", send: "\x1b[1~" },
                 { label: "End", keyCode: 35, key: "End", send: "\x1b[4~" },
                 { label: "PgUp", keyCode: 33, key: "PageUp", send: "\x1b[5~" },
                 { label: "PgDn", keyCode: 34, key: "PageDown", send: "\x1b[6~" },
+
+                // Row 3: Modifiers
                 { label: "Ctrl", keyCode: 17, key: "Control", isModifier: true },
                 { label: "Alt", keyCode: 18, key: "Alt", isModifier: true },
                 { label: "Cmd", keyCode: 91, key: "Meta", isModifier: true },
+
+                // Row 4: Arrow keys
                 { label: "↑", keyCode: 38, key: "ArrowUp", send: "\x1b[A" },
                 { label: "↓", keyCode: 40, key: "ArrowDown", send: "\x1b[B" },
                 { label: "←", keyCode: 37, key: "ArrowLeft", send: "\x1b[D" },
                 { label: "→", keyCode: 39, key: "ArrowRight", send: "\x1b[C" },
             ];
+
+            // Character keys for Ctrl combinations (used when iOS keyboard types A-Z while Ctrl is held)
+            var charKeys = {};
+            for (var i = 65; i <= 90; i++) {
+                charKeys[i] = { label: String.fromCharCode(i), keyCode: i, key: String.fromCharCode(i), send: String.fromCharCode(i - 64) };
+            }
 
             /***** Initialization *****/
 
@@ -114,13 +120,8 @@ define(function(require, exports, module) {
             function createKeyboardBar() {
                 try {
                     console.log("[keyboard] Creating keyboard bar...");
-                    
-                    // Create overlay (non-interactive, for visual background only)
-                    keyboardOverlay = document.createElement("div");
-                    keyboardOverlay.style.cssText = "display:none;position:fixed;top:0;left:0;width:100%;height:100%;z-index:9997;pointer-events:none;background:rgba(0,0,0,0.3);";
-                    document.body.appendChild(keyboardOverlay);
 
-                    // Create keyboard bar container
+                    // Create keyboard bar container (no overlay)
                     keyboardBar = document.createElement("div");
                     keyboardBar.id = "c9-dev-keyboard";
                     keyboardBar.style.cssText = [
@@ -131,13 +132,12 @@ define(function(require, exports, module) {
                         "border:1px solid #555;",
                         "border-radius:8px;",
                         "box-shadow:0 4px 12px rgba(0,0,0,0.5);",
-                        "padding:6px;",
+                        "padding:8px;",
                         "flex-direction:column;",
-                        "gap:4px;",
+                        "gap:6px;",
                         "user-select:none;",
                         "-webkit-user-select:none;",
-                        "min-width:300px;",
-                        "max-width:90vw;"
+                        "min-width:400px;"
                     ].join("");
 
                     // Header bar (for dragging)
@@ -186,9 +186,13 @@ define(function(require, exports, module) {
 
                     // Group keys by rows
                     var rows = [
-                        keyDefs.filter(function(k) { return k.keyCode >= 112 && k.keyCode <= 123; }),
+                        // Row 1: F11, F12, ^C (Ctrl+C combo)
+                        keyDefs.filter(function(k) { return k.label === "F11" || k.label === "F12" || k.isComboCtrlC; }),
+                        // Row 2: Navigation keys
                         keyDefs.filter(function(k) { return [27, 9, 8, 46, 36, 35, 33, 34].indexOf(k.keyCode) !== -1; }),
+                        // Row 3: Modifiers
                         keyDefs.filter(function(k) { return k.isModifier; }),
+                        // Row 4: Arrow keys
                         keyDefs.filter(function(k) { return [38, 40, 37, 39].indexOf(k.keyCode) !== -1; }),
                     ];
 
@@ -223,21 +227,16 @@ define(function(require, exports, module) {
                     "border:1px solid #555;",
                     "border-radius:4px;",
                     "color:#ddd;",
-                    "font-size:" + (keyDef.label.length > 3 ? "10px" : "12px") + "px;",
+                    "font-size:15px;",
                     "font-family:sans-serif;",
-                    "padding:4px 8px;",
+                    "padding:8px 12px;",
                     "cursor:pointer;",
-                    "min-width:" + (isModifier ? "50px" : "28px") + ";",
-                    "text-align:center;"
+                    "min-width:40px;",
+                    "text-align:center;",
+                    "transition:background 0.1s;"
                 ].join("");
 
                 btn.onmousedown = function(e) {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    handleKeyPress(keyDef, btn);
-                };
-
-                btn.ontouchstart = function(e) {
                     e.preventDefault();
                     e.stopPropagation();
                     handleKeyPress(keyDef, btn);
@@ -391,7 +390,6 @@ define(function(require, exports, module) {
             function showKeyboard() {
                 isVisible = true;
                 keyboardBar.style.display = "flex";
-                keyboardOverlay.style.display = "block";
                 
                 // Position at bottom-center to avoid blocking the menu bar
                 var barW = keyboardBar.offsetWidth;
@@ -400,20 +398,11 @@ define(function(require, exports, module) {
                 var y = Math.max(10, window.innerHeight - barH - 20);
                 keyboardBar.style.left = x + "px";
                 keyboardBar.style.top = y + "px";
-                
-                // Ensure overlay doesn't block button clicks by placing it below the keyboard bar
-                setTimeout(function() {
-                    var btn = document.querySelector('.keyboard-btn');
-                    if (btn) {
-                        btn.style.zIndex = '10000';
-                    }
-                }, 50);
             }
 
             function hideKeyboard() {
                 isVisible = false;
                 keyboardBar.style.display = "none";
-                keyboardOverlay.style.display = "none";
                 modifierState = { ctrl: false, alt: false, meta: false };
             }
 
@@ -423,10 +412,29 @@ define(function(require, exports, module) {
                 if (keyboardBar && keyboardBar.parentNode) {
                     keyboardBar.parentNode.removeChild(keyboardBar);
                 }
-                if (keyboardOverlay && keyboardOverlay.parentNode) {
-                    keyboardOverlay.parentNode.removeChild(keyboardOverlay);
+                // Remove global keydown listener if it exists
+                if (globalKeyHandler) {
+                    document.removeEventListener("keydown", globalKeyHandler);
                 }
             });
+
+            // Global keydown listener for iOS character keys when modifier is held
+            var globalKeyHandler = function(e) {
+                // Only handle if keyboard bar is visible and modifier is held
+                if (!isVisible) return;
+                
+                var ctrl = e.ctrlKey || modifierState.ctrl;
+                if (!ctrl) return;
+
+                // Handle Ctrl+C specifically (^C = SIGINT)
+                if (ctrl && e.keyCode === 99) { // 'c' key
+                    e.preventDefault();
+                    sendToTerminal("\x03");
+                    dispatchKeyEvent({ label: "^C", keyCode: 99, key: "c" }, true, false, false);
+                }
+            };
+
+            document.addEventListener("keydown", globalKeyHandler);
 
             /***** Register and define API *****/
 
