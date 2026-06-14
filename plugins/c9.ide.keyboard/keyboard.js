@@ -115,12 +115,9 @@ define(function(require, exports, module) {
                 try {
                     console.log("[keyboard] Creating keyboard bar...");
                     
-                    // Create overlay
+                    // Create overlay (non-interactive, for visual background only)
                     keyboardOverlay = document.createElement("div");
-                    keyboardOverlay.style.cssText = "display:none;position:fixed;top:0;left:0;width:100%;height:100%;z-index:9998;";
-                    keyboardOverlay.addEventListener("mousedown", function(e) {
-                        if (e.target === keyboardOverlay) hideKeyboard();
-                    });
+                    keyboardOverlay.style.cssText = "display:none;position:fixed;top:0;left:0;width:100%;height:100%;z-index:9997;pointer-events:none;background:rgba(0,0,0,0.3);";
                     document.body.appendChild(keyboardOverlay);
 
                     // Create keyboard bar container
@@ -129,12 +126,12 @@ define(function(require, exports, module) {
                     keyboardBar.style.cssText = [
                         "position:fixed;",
                         "z-index:9999;",
+                        "display:none;",
                         "background:#2a2a2a;",
                         "border:1px solid #555;",
                         "border-radius:8px;",
                         "box-shadow:0 4px 12px rgba(0,0,0,0.5);",
                         "padding:6px;",
-                        "display:flex;",
                         "flex-direction:column;",
                         "gap:4px;",
                         "user-select:none;",
@@ -162,12 +159,22 @@ define(function(require, exports, module) {
                     title.textContent = "Dev Keyboard";
                     header.appendChild(title);
 
-                    // Dismiss button
+                    // Dismiss button with clear X icon
                     var dismissBtn = document.createElement("button");
-                    dismissBtn.innerHTML = "&#x2715;";
+                    dismissBtn.innerHTML = "&#10005;"; // X symbol
                     dismissBtn.style.cssText = [
-                        "background:none;border:none;color:#aaa;font-size:16px;cursor:pointer;padding:0 4px;line-height:1;"
+                        "background:#333;",
+                        "border:1px solid #555;",
+                        "color:#ddd;",
+                        "font-size:14px;",
+                        "cursor:pointer;",
+                        "padding:2px 6px;",
+                        "border-radius:3px;",
+                        "line-height:1;",
+                        "transition:background 0.2s;"
                     ].join("");
+                    dismissBtn.onmouseenter = function() { dismissBtn.style.background = "#555"; };
+                    dismissBtn.onmouseleave = function() { dismissBtn.style.background = "#333"; };
                     dismissBtn.onclick = function(e) { e.stopPropagation(); hideKeyboard(); };
                     header.appendChild(dismissBtn);
 
