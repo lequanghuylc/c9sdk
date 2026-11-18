@@ -126,7 +126,7 @@ define(function(require, exports, module) {
         }
 
         function isOnline(callback) {
-            http.request("/_ping", {
+            http.request((options.pathPrefix || "") + "/_ping", {
                 timeout: 3000,
                 headers: {
                     Accept: "application/json"
