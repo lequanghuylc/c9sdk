@@ -34,8 +34,11 @@ module.exports = function(manifest, installPath) {
         ? "~" + installPath.substr(home.length)
         : installPath;
     var inContainer = os.hostname().match(/-\d+$/);
-    var subPath = (process.env.C9_SUB_PATH || "").replace(/^\/+|\/+$/g, "");
-    
+
+    // Serve the IDE below a sub path, e.g. C9_SUB_PATH=/ide -> https://domain/ide/
+    var pathPrefix = (process.env.C9_SUB_PATH || "").trim().replace(/^\/+|\/+$/g, "");
+    pathPrefix = pathPrefix ? "/" + pathPrefix : "";
+
     var config = {
         standalone: true,
         startBridge: true,
@@ -59,18 +62,20 @@ module.exports = function(manifest, installPath) {
         tmux: path.join(installPath, "bin/tmux"),
         nakBin: path.join(__dirname, "../node_modules/nak/bin/nak"),
         bashBin: "bash",
-        nodeBin: [path.join(installPath, win32 ? "node.exe" : "node/bin/node"), process.execPath],
+        // run the vfs worker with the same (up to date) node that runs the server,
+        // ~/.c9/node from the c9 installer is an outdated node v6 kept only as fallback
+        nodeBin: [process.execPath, path.join(installPath, win32 ? "node.exe" : "node/bin/node")],
         installPath: installPath,
         correctedInstallPath: correctedInstallPath,
-        staticPrefix: "/static",
+        pathPrefix: pathPrefix,
+        staticPrefix: pathPrefix + "/static",
         projectUrl: "/workspace",
         ideBaseUrl: "http://c9.io",
-        previewUrl: "/preview",
+        previewUrl: pathPrefix + "/preview",
         dashboardUrl: "https://c9.io/dashboard.html",
         accountUrl: "https://c9.io/account",
-        apiUrl: "/api",
+        apiUrl: pathPrefix + "/api",
         homeUrl: "/home",
-        configsPrefix: "/configs",
         collab: false,
         installed: true,
         packed: false,
@@ -80,7 +85,7 @@ module.exports = function(manifest, installPath) {
         isAdmin: true,
         runners: runners,
         builders: builders,
-        themePrefix: "/static/standalone/skin",
+        themePrefix: pathPrefix + "/static/standalone/skin",
         cdn: {
             version: "standalone",
             cacheDir: __dirname + "/../build",

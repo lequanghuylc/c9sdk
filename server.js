@@ -2,6 +2,7 @@
 "use strict";
 
 require("amd-loader");
+require("./scripts/node-compat");
 try {
     require("heapdump");
 } catch(e) {}

@@ -47,8 +47,8 @@ define(function(require, exports, module) {
             var filenameHeader = "attachment; filename*=utf-8''" + escape(filename);
 
             var proc;
-            req.on("close", function() {
-                if (proc) proc.kill();
+            res.on("close", function() {
+                if (proc && !res.writableFinished) proc.kill();
             });
             
             if (req.uri.query.isfile) {

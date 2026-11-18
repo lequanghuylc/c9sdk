@@ -135,11 +135,11 @@ function plugin(options, imports, register) {
             });
 
             // if the clients aborts the request we have to kill the ssh process
-            req.on("close", function() {
+            // (node >= 16 emits "close" on req once the body is read, so listen on res)
+            res.on("close", function() {
+                if (done || res.writableFinished) return;
                 done = true;
                 cancel();
-                if(!res.headersSent)
-                    res.json({}, 0, 500);
             });
         }
     ]);

@@ -110,6 +110,7 @@ module.exports = function(options) {
             region: options.region,
             pid: options.project.id,
             servers: options.vfsServers,
+            pathPrefix: options.pathPrefix,
             updateServers: hosted,
             strictRegion: options.strictRegion
                 || options.mode === "beta" && "beta",

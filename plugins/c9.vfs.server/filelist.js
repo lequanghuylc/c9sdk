@@ -77,8 +77,9 @@ define(function(require, exports, module) {
                     process.stdout.pipe(res);
                 });
                 
-                req.on("close", function () {
-                    process && process.kill();
+                res.on("close", function () {
+                    if (!res.writableFinished)
+                        process && process.kill();
                 });
                 
                 var stderr = "";

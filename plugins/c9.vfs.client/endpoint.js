@@ -65,7 +65,7 @@ define(function(require, exports, module) {
                 options.getServers = undefined;
                 var loc = require("url").parse(baseURI || document.baseURI || window.location.href);
                 var defaultServers = [{
-                    url: loc.protocol + "//" + loc.hostname + (loc.port ? ":" + loc.port : "") + "/vfs",
+                    url: loc.protocol + "//" + loc.hostname + (loc.port ? ":" + loc.port : "") + (options.pathPrefix || "") + "/vfs",
                     region: "default"
                 }];
                 servers = (urlServers || options.servers || defaultServers).map(function(server) {

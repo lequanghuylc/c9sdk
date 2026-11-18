@@ -122,6 +122,7 @@ module.exports = function(config, optimist) {
             websocket: true,
             showRealIP: !config.mode,
             secure: config.secure,
+            pathPrefix: config.pathPrefix
         },
         {
             packagePath: "connect-architect/connect.basicauth",
@@ -130,7 +131,9 @@ module.exports = function(config, optimist) {
         },
         {
             packagePath: "connect-architect/connect.static",
-            prefix: config.staticPrefix
+            // public url (may include the sub path), routes are always bound at /static
+            prefix: config.staticPrefix,
+            bindPrefix: "/static"
         },
         {
             packagePath: "./c9.error/error_handler",
@@ -167,11 +170,10 @@ module.exports = function(config, optimist) {
                 "c9.cli.bridge": true,
                 "c9.nodeapi": true,
                 "saucelabs.preview": true,
-            "salesforce.sync": true,
-            "salesforce.language": true
+                "salesforce.sync": true,
+                "salesforce.language": true
+            }
         },
-        subPath: process.env.C9_SUB_PATH || ""
-    },
         "./c9.preview/statics",
         "./c9.nodeapi/nodeapi",
         {
@@ -190,8 +192,7 @@ module.exports = function(config, optimist) {
             projectUrl: config.projectUrl,
             homeUrl: config.homeUrl,
             workspaceType: workspaceType,
-            readonly: readonly,
-            subPath: process.env.C9_SUB_PATH || ""
+            readonly: readonly
         },
         "./c9.vfs.server/vfs.server",
         "./c9.error/logger.raygun_noop",
